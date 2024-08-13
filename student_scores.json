@@ -1,0 +1,44 @@
+{
+    "students": [
+        {
+            "roll_no": "1",
+            "score": 9.5
+        },
+        {
+            "roll_no": "2",
+            "score": 4.5
+        },
+        {
+            "roll_no": "3",
+            "score": 9.2
+        },
+        {
+            "roll_no": "4",
+            "score": 6.3
+        },
+        {
+            "roll_no": "5",
+            "score": 9.01
+        },
+        {
+            "roll_no": "6",
+            "score": 9.2
+        },
+        {
+            "roll_no": "7",
+            "score": 8.0
+        },
+        {
+            "roll_no": "8",
+            "score": 7.1
+        },
+        {
+            "roll_no": "9",
+            "score": 6.4
+        },
+        {
+            "roll_no": "10",
+            "score": 8.8
+        }
+    ]
+}
