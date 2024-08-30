@@ -11,8 +11,8 @@ Follow these steps to set up and run the application:
 First, clone this repository to your local machine:
 
 ```bash
-git clone https://github.com/your-username/repo-name.git
-cd repo-name
+git clone https://github.com/sans0408/edu-content-genAI.git
+cd edu-content-genAI
 ```
 
 ### 2. Create a Separate Folder to Run the Code
