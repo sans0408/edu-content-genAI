@@ -3,21 +3,21 @@ import json
 import re
 import pandas as pd
 import altair as alt
-import ollama
+import ollama   
 
 summary_prompts = {
     'Weak': f'''You are an AI assistant who generates very detailed academic notes of the user's topic. It should revise all the basic concepts.
 Use the following format:
 **Topic Summary - [Topic]:**
-[Summary in markdown format]''',
+[Summary in documented format]''',
     'Average': '''You are an AI assistant who generates a detailed academic summary of the user's topic. It should quickly revise important concepts.
 Use the following format:
 **Topic Summary - [Topic]:**
-[Summary in markdown format]''',
+[Summary in documented format]''',
     'Advanced': f'''You are an AI assistant who generates a academic summary of the user's topic. It should quickly revise key concepts, but in depth.
 Use the following format:
 **Topic Summary - [Topic]:**
-[Summary in markdown format]'''
+[Summary in documented format]'''
 }
 
 quiz_prompts = {
@@ -89,278 +89,292 @@ flashcard_prompts = {
     Back: [Answer]'''
 }
 
-st.set_page_config(
-        page_title="Educational Content Gen",
-        page_icon="📝"
-        )
+try:
+    st.set_page_config(
+            page_title="Educational Content Gen",
+            page_icon="📝"
+            )
 
-def load_student_data():
-    '''Reads student scores from file using json module'''
-    with open("student_scores.json", "r") as file:
-        return json.load(file)
+    def save_student_data(data, filename="student_scores.csv"):
+        '''Save the updated DataFrame to a CSV file'''
+        data.to_csv(filename, index=False)
+        st.success(f"Student data successfully saved to {filename}.")
 
-def save_student_data(data):
-    '''Writes updated student data to file using json module'''
-    with open("student_scores.json", "w") as file:
-        json.dump(data, file, indent=4)
+    def load_student_data(filename="student_scores.csv"):
+        '''Load student data from a CSV file'''
+        return pd.read_csv(filename)
 
-def get_student_category(score):
-    '''Maps student scores to student categories'''
-    if 1 <= score <= 5:
-        return "Weak"
-    elif 5 < score < 7.5:
-        return "Average"
-    else:
-        return "Advanced"
-
-def teacher_interface(student_data):
-    '''Display the teacher's interface for updating scores'''
-    st.header("User Role: Teacher", divider = 'blue')
-    
-    # Score Updation
-    st.subheader(" \n\nUpdate Student Score", divider = 'gray')
-    roll_no = st.text_input("Enter Student Roll Number")
-    score = st.number_input("Enter CGPA Score", min_value=1.0, max_value=10.0, step=0.1)
-    
-    if st.button("Update Score"):
-        if not roll_no.isdigit() or not (1 <= int(roll_no) <= 10):
-            st.error("Invalid roll number. Please enter a roll number between 1 and 10.")
-        elif not (1 <= score <= 10):
-            st.error('Enter valid CGPA Score (1-10).')
+    def get_student_category(score):
+        '''Maps student scores to student categories'''
+        if 1 <= score <= 6:
+            return "Weak"
+        elif 6 < score < 9:
+            return "Average"
         else:
-            for student in student_data["students"]:
-                if student["roll_no"] == roll_no:
-                    student["score"] = score
-                    save_student_data(student_data)
-                    st.success(f"Test score for roll number {roll_no} updated to {score}.")
-                    break
+            return "Advanced"
 
-    # Student category for a specific roll number
-    st.divider()
-    st.subheader(" \n\nCheck Student Category", divider = 'gray')
-    roll_no = st.text_input("Enter Your Roll Number")
-    if st.button(f"Check category"):
-        if not roll_no.isdigit() or not (1 <= int(roll_no) <= 10):
-                st.warning("Invalid roll number. Please enter a roll number between 1 and 10.")
-        else:
-            roll_no = int(roll_no)
-            student_found = None
-            for student in student_data["students"]:
-                if int(student["roll_no"]) == roll_no:
-                    student_found = student
-                    break
+    def teacher_interface():
+        st.header("User Role: Teacher", divider='blue')
 
-            if student_found:
-                category = get_student_category(student_found["score"])
-                div = {"Weak":'red',"Average":'blue',"Advanced":'green'}
-                st.subheader(f"Student {roll_no} is in category: _{category}_", divider = div[category])
+        # Section to upload and view the CSV file
+        st.subheader("\n\nUpload Student Scores CSV", divider='gray')
+        passwd = 'teacher'
+        passwd = st.text_input("Enter password",type='password')
+        if st.checkbox("Enable Edits"):
+            if passwd == 'teacher':
+                uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 
-    # Comprehensive Student Performance Chart
-    st.divider()
-    st.subheader(" \n\nView student performance chart", divider = 'gray')
-    if st.button('View Chart'):
-        student_list = []
-        for student in student_data["students"]:
-            category = get_student_category(student["score"])
-            student_list.append({
-                "Roll Number": int(student["roll_no"]),
-                "Score": student["score"],
-                "Category": category
-            })
-        df = pd.DataFrame(student_list)
+                if uploaded_file is not None:
+                    df = pd.read_csv(uploaded_file)
+                    st.dataframe(df,use_container_width=True)
+                    if st.button("Save Uploaded Data"):
+                        # Save or process the CSV data
+                        df.to_csv("student_scores.csv", index=False)
+                        st.success("CSV data has been saved successfully.")
+
+            else:
+                st.error("Incorrect Password! Access denied.")
+
+        # Load student data
+        df = load_student_data()
+
+        # Check Student Category
+        st.divider()
+        st.subheader("Check Student Category", divider='gray')
+        prn = st.text_input("Enter Student PRN to Check Category")
+        if st.button("Check Category"):
+            if not (prn in df['PRN'].astype(str).values):
+                st.warning("Invalid PRN. Please enter a valid PRN.")
+            else:
+                avg_score = df.loc[df['PRN'] == prn, ["IE1", "MTE", "IE2", "ETE"]].mean(axis=1).values[0]
+                category = get_student_category(avg_score)
+                div = {"Weak": 'red', "Average": 'blue', "Advanced": 'green'}
+                st.subheader(f"Student {prn} is in category: _{category}_", divider=div[category])
+
+        # Comprehensive Student Performance Chart
+        st.divider()
+        st.subheader("View Student Performance Chart", divider='gray')
+
+        if st.button('View Chart'):
+            summary_df = df[['PRN', 'IE1', 'MTE', 'IE2', 'ETE']].copy()
+            summary_df['Average Score'] = summary_df[['IE1', 'MTE', 'IE2', 'ETE']].mean(axis=1)
+            summary_df['Category'] = summary_df['Average Score'].apply(get_student_category)
+
+            # Display Pie Chart
+            st.subheader("Class Performance Pie Chart")
+            category_counts = summary_df['Category'].value_counts().reset_index()
+            category_counts.columns = ['Category', 'Count']
+
+            pie_chart = alt.Chart(category_counts).mark_arc().encode(
+                theta=alt.Theta(field='Count', type='quantitative'),
+                color=alt.Color(field='Category', type='nominal', scale=alt.Scale(range=["#85f496", "#83eef2", "#db4053"])),
+                tooltip=['Category', 'Count']
+            ).interactive()
+
+            st.altair_chart(pie_chart, use_container_width=True)
+
+        # View Top 5 Students per test
+        st.divider()
+        st.subheader("View Top 5 Students", divider='gray')
+        test = st.selectbox("Select Test to View Top 5", df.columns[1:])
+            
+        if st.button("Show Top 5"):
+            top_5_df = df[['PRN', test]].sort_values(by=test, ascending=False).head(5).reset_index(drop=True)
+            st.table(top_5_df.style.hide(axis='index'))
+
+        # View Top 5 Students overall
+        st.divider()
+        df['Total Score'] = df[['IE1', 'MTE', 'IE2', 'ETE']].sum(axis=1)
+        st.subheader("Overall Toppers", divider='gray')
+        top5 = df[['PRN', 'Total Score']].sort_values(by='Total Score', ascending=False).head(5)
+        st.table(top5.style.hide(axis="index"))
+
+    def system_interface():
+        '''Display all students' scores'''
+        st.header("User Role: System Admin", divider = 'blue')
+
+        # Load student data
+        df = load_student_data()
+
+        # Editable CSV Option
+        st.subheader("View and Edit Student Scores", divider='gray')
+
+        psswd = 'admin'
+        psswd = st.text_input('Enter password for admin rights:',type='password')
+        if st.checkbox("Enable Edits"):
+            if psswd == "admin":
+                edited_df = st.data_editor(df,use_container_width=True)
+                if st.button("Save Changes"):
+                    save_student_data(edited_df)
+            else:
+                st.error("Incorrect Password for System Admin. Access denied.")
+
+    if 'clicked' not in st.session_state: # Initialise session_state for button click
+        st.session_state.clicked = False
+
+    def click_button():
+        '''Permanently mark clicked as True to avoid termination of 'if button clicked' block'''
+        st.session_state.clicked = True
+
+    def submit_quiz():
+        st.session_state.quiz_submitted = True
+
+    def student_interface():
+        '''Student Interface that generates educational content - summary, quiz and flashcards'''
+        st.header("User Role: Student", divider = 'blue')
         
-        # Display chart using altair
-        st.subheader("Class Performance Chart")
-        chart = alt.Chart(df).mark_bar().encode(
-            x=alt.X('Roll Number:O', sort='ascending'),
-            y='Score:Q',
-            color={'field':'Category', 'type':'nominal', "scale": {"range": ["#85f496", "#83eef2", "#db4053"]}},
-            tooltip=['Roll Number', 'Score', 'Category']
-        ).interactive()
-        
-        st.altair_chart(chart, use_container_width=True)
+        df = load_student_data()
 
-def system_interface(student_data):
-    '''Display all students' scores'''
-    st.header("User Role: System Admin", divider = 'blue')
-    
-    if st.button("Display Student Scores"):
-        student_list = []
-        for student in student_data["students"]:
-            category = get_student_category(student["score"])
-            student_list.append({
-                "Roll Number": student["roll_no"],
-                "CGPA Score": student["score"],
-                "Learner Category": category
-            })
-        
-        df = pd.DataFrame(student_list)
-        
-        st.dataframe(df, hide_index = True, use_container_width = True, )
+        prn = st.selectbox("Select PRN",list(df['PRN'].values))
+        st.button('Revise Topics', on_click=click_button)
 
-if 'clicked' not in st.session_state: # Initialise session_state for button click
-    st.session_state.clicked = False
+        if st.session_state.clicked:  # if button is clicked, content will be displayed
+            # Filter the row corresponding to the entered PRN
+            student_row = df[df['PRN'] == prn]
 
-def click_button():
-    '''Permanently mark clicked as True to avoid termination of 'if button clicked' block'''
-    st.session_state.clicked = True
+            # Calculate the average score for non-null test values
+            test_columns = ['IE1', 'MTE', 'IE2', 'ETE']
+            scores = student_row[test_columns].dropna(axis=1, how='all').mean(axis=1).values[0]
 
-def submit_quiz():
-    st.session_state.quiz_submitted = True
+            # Map the student category based on the aggregated score
+            category = get_student_category(scores)
 
-def student_interface(student_data):
-    '''Student Interface that generates educational content - summary, quiz and flashcards'''
-    st.header("User Role: Student", divider = 'blue')
-    
-    roll_no = st.text_input("Enter Your Roll Number")
-    st.button('Revise Topics', on_click=click_button)
+            # Select a topic to study
+            topic = st.selectbox("Choose Topic",["Virtualization","Cloud Security","Word embedding in NLP","Types of tokenization",""])
+            page = st.selectbox("Choose Study Mode", ["Summary", "Topic Quiz", "Flashcards"], index = None, placeholder = "Select mode")
+            
+            if page == "Summary":
+                st.header("Summary")
+                summary_prompt = summary_prompts[category]
+                result = ollama.chat(model = "llama3.1:8b-instruct-q2_K", 
+                                    messages = [{"role":"system","content":summary_prompt},
+                                                {"role":"user","content":f'''User's topic: {topic}'''}])
+                summary = result['message']['content']
+                st.write(summary)
 
-    if st.session_state.clicked: # if button is clicked, content will be displayed
-        if not roll_no.isdigit() or not (1 <= int(roll_no) <= 10):
-            st.warning("Invalid roll number. Please enter a roll number between 1 and 10.")
-        else:
-            roll_no = int(roll_no)
-            student_found = None
-            for student in student_data["students"]:
-                if int(student["roll_no"]) == roll_no:
-                    student_found = student
-                    break
+            elif page == "Topic Quiz":
+                st.header("Quiz Questions")
 
-            if student_found:
-                category = get_student_category(student_found["score"])
-
-                # Select a topic to study
-                topic = st.selectbox("Select Topic", ["Data Structures and Algorithms", "Object-Oriented Programming"], index = None, placeholder = "Select topic" )
-                page = st.selectbox("Choose study mode", ["Summary", "Topic Quiz", "Flashcards"], index = None, placeholder = "Select mode")
-                
-                if page == "Summary":
-                    st.header("Summary")
-                    summary_prompt = summary_prompts[category]
+                if 'saved_quiz_topic' not in st.session_state or st.session_state.saved_quiz_topic != topic:
+                    quiz_prompt = quiz_prompts[category]                       
                     result = ollama.chat(model = "llama3.1:8b-instruct-q2_K", 
-                                        messages = [{"role":"system","content":summary_prompt},
+                                            messages = [{"role":"system","content":quiz_prompt},
                                                         {"role":"user","content":f'''User's topic: {topic}'''}])
-                    summary = result['message']['content']
-                    st.write(summary)
+                    qz = result['message']['content']
+                    # print(qz)
+                    # st.write(qz)
+                    # Regular expression to extract the question, options, and answer
+                    pattern1 = r"\*\*Question (\d+):\*\* (.*?)\n\n\s*A\) (.*?)\n\s*B\) (.*?)\n\s*C\) (.*?)\n\s*D\) (.*?)\n\n"
 
-                elif page == "Topic Quiz":
-                    st.header("Quiz Questions")
+                    # Find matches
+                    matches = re.findall(pattern1, qz, re.DOTALL)
 
-                    if 'saved_quiz_topic' not in st.session_state or st.session_state.saved_quiz_topic != topic:
-                        quiz_prompt = quiz_prompts[category]                       
-                        result = ollama.chat(model = "llama3.1:8b-instruct-q2_K", 
-                                                messages = [{"role":"system","content":quiz_prompt},
-                                                            {"role":"user","content":f'''User's topic: {topic}'''}])
-                        qz = result['message']['content']
-                        
-                        # Regular expression to match questions and answer options
-                        pattern1 = r"\*\*Question (\d+):\*\* (.*?)\n\n\s*A\) (.*?)\n\s*B\) (.*?)\n\s*C\) (.*?)\n\s*D\) (.*?)\n\n"
-                        
-                        # Find all matches
-                        matches = re.findall(pattern1, qz, re.DOTALL)
-                        
-                        # Create a nested dictionary from the matches
-                        qd = {
-                            f"{question_number}. {question_text}": {
-                                "A": option_a.strip(),
-                                "B": option_b.strip(),
-                                "C": option_c.strip(),
-                                "D": option_d.strip()
-                            }
-                            for question_number, question_text, option_a, option_b, option_c, option_d in matches
+                    # Process and create a dictionary from the matches
+                    qd = {
+                        f"{question_number}. {question_text}": {
+                            "A": option_a.strip(),
+                            "B": option_b.strip(),
+                            "C": option_c.strip(),
+                            "D": option_d.strip(),
                         }
-
-                        st.session_state.quiz_content = qd
-                        st.session_state.saved_quiz_topic = topic  # Save the current topic
-                        st.session_state.submitted = False
-                        st.session_state.answers = {}
-
-                    # Retrieve the cached quiz content
-                    qd = st.session_state.quiz_content
+                        for question_number, question_text, option_a, option_b, option_c, option_d in matches
+                    }
                     # st.write(qd)
-                    # Create radio buttons for each question
-                    for question in qd.keys():
-                        st.divider()
-                        if st.session_state.submitted:
-                            # If quiz is submitted, show the selected answer and disable the radio button
-                            st.write(f"{question}\n\nYour answer: {st.session_state.answers[question]}")
-                        else:
-                            # If quiz is not submitted, show the radio button to select an answer
-                            answer = st.radio(
-                                question,
-                                [f"A. {qd[question]['A']}", f"B. {qd[question]['B']}", f"C. {qd[question]['C']}", f"D. {qd[question]['D']}"],
-                                key=question
-                            )
-                            st.session_state.answers[question] = answer
+                    st.session_state.quiz_content = qd
+                    st.session_state.saved_quiz_topic = topic  # Save the current topic
+                    st.session_state.submitted = False
+                    st.session_state.answers = {}
 
-                    # Submit button
-                    if not st.session_state.submitted:
-                        if st.button("Submit Quiz"):
-                            st.session_state.submitted = True
-                            st.write("Answers Submitted!")
-                            st.button("View your answers")
+                # Retrieve the cached quiz content
+                qd = st.session_state.quiz_content
+                # st.write(qd)
+                # Create radio buttons for each question
+                for question in qd.keys():
+                    st.divider()
+                    if st.session_state.submitted:
+                        # If quiz is submitted, show the selected answer and disable the radio button
+                        st.write(f"{question}\n\nYour answer: {st.session_state.answers[question]}\n")
+
                     else:
-                        st.warning("Your answers have been submitted. You cannot change them now.")
+                        # If quiz is not submitted, show the radio button to select an answer
+                        answer = st.radio(
+                            question,
+                            [f"A. {qd[question]['A']}", f"B. {qd[question]['B']}", f"C. {qd[question]['C']}", f"D. {qd[question]['D']}"],
+                            key=question
+                        )
+                        st.session_state.answers[question] = answer
 
-                elif page == "Flashcards":
-                    st.header("Flashcards")
+                # Submit button
+                if not st.session_state.submitted:
+                    if st.button("Submit Quiz"):
+                        st.session_state.submitted = True
+                        st.write("Answers Submitted!")
+                else:
+                    st.warning("Your answers have been submitted. You cannot change them now.")
+
+            elif page == "Flashcards":
+                st.header("Flashcards")
+                
+                # Cache the flashcards to avoid regenerating them
+                # Check if the topic has changed or flashcards need to be generated
+                if 'saved_topic' not in st.session_state or st.session_state.saved_topic != topic:
+                    flashcard_prompt = flashcard_prompts[category]
+                    result = ollama.chat(model="llama3.1:8b-instruct-q2_K", 
+                                        messages=[
+                                            {"role": "system", "content": flashcard_prompt},
+                                            {"role": "user", "content": f'''User's topic: {topic}'''}
+                                        ])
+                    flashcards = result['message']['content']
+                    # print(flashcards)
+                    st.session_state.flashcards = re.findall(r'Card \d+:.*?(?=Card \d+:|$)', flashcards, re.DOTALL)
+                    st.session_state.saved_topic = topic  # Save the current topic
+
+
+                cards = st.session_state.flashcards
+
+                for i, card in enumerate(cards):
+                    # Extract the front and back of the flashcard
+                    front_match = re.search(r'Front:\s*(.*)Back:', card, re.DOTALL)
+                    back_match = re.search(r'Back:\s*(.*)\*\*', card, re.DOTALL)
                     
-                    # Cache the flashcards to avoid regenerating them
-                    # Check if the topic has changed or flashcards need to be generated
-                    if 'saved_topic' not in st.session_state or st.session_state.saved_topic != topic:
-                        flashcard_prompt = flashcard_prompts[category]
-                        result = ollama.chat(model="llama3.1:8b-instruct-q2_K", 
-                                            messages=[
-                                                {"role": "system", "content": flashcard_prompt},
-                                                {"role": "user", "content": f'''User's topic: {topic}'''}
-                                            ])
-                        flashcards = result['message']['content']
-                        st.session_state.flashcards = re.findall(r'Card \d+:.*?(?=Card \d+:|$)', flashcards, re.DOTALL)
-                        st.session_state.saved_topic = topic  # Save the current topic
+                    if front_match:
+                        front = re.sub(r'\s+', ' ', front_match.group(1)).strip()
+                    else:
+                        front = "No question provided."
+                    
+                    if back_match:
+                        back = re.sub(r'\s+', ' ', back_match.group(1)).strip()
+                    else:
+                        back = "No answer provided."
+                    
+                    # Create a unique key for each flashcard state
+                    key = f'flashcard_{i}'
+                    
+                    # Initialize the state if it doesn't exist
+                    if key not in st.session_state:
+                        st.session_state[key] = True
+                    
+                    # Button to flip the flashcard
+                    if st.button(f"Flip Flashcard {i+1}", key=f"button_{key}"):
+                        st.session_state[key] = not st.session_state[key]
 
+                    # Display the question or the answer based on the state
+                    if st.session_state[key]:
+                        st.info(f"Question: {front}")
+                    else:
+                        st.info(f"Answer: {back}")
 
-                    cards = st.session_state.flashcards
+    if __name__ == "__main__":
+        st.title("AI-Powered Educational Content Generator")
+        # Select user role
+        role = st.sidebar.selectbox("Select Your Role", ["Teacher", "System Admin", "Student"])
 
-                    for i, card in enumerate(cards):
-                        # Extract the front and back of the flashcard
-                        front_match = re.search(r'Front:\s*(.*)Back:', card, re.DOTALL)
-                        back_match = re.search(r'Back:\s*(.*)\*\*', card, re.DOTALL)
-                        
-                        if front_match:
-                            front = re.sub(r'\s+', ' ', front_match.group(1)).strip()
-                        else:
-                            front = "No question provided."
-                        
-                        if back_match:
-                            back = re.sub(r'\s+', ' ', back_match.group(1)).strip()
-                        else:
-                            back = "No answer provided."
-                        
-                        # Create a unique key for each flashcard state
-                        key = f'flashcard_{i}'
-                        
-                        # Initialize the state if it doesn't exist
-                        if key not in st.session_state:
-                            st.session_state[key] = True
-                        
-                        # Button to flip the flashcard
-                        if st.button(f"Flip Flashcard {i+1}", key=f"button_{key}"):
-                            st.session_state[key] = not st.session_state[key]
+        if role == "Teacher":
+            teacher_interface()
+        elif role == "System Admin":
+            system_interface()
+        else:
+            student_interface()
 
-                        # Display the question or the answer based on the state
-                        if st.session_state[key]:
-                            st.info(f"Question: {front}")
-                        else:
-                            st.info(f"Answer: {back}")
-
-if __name__ == "__main__":
-    st.title("AI-Powered Educational Content Generator")
-    # Select user role
-    role = st.sidebar.selectbox("Select Your Role", ["Teacher", "System Admin", "Student"])
-    student_data = load_student_data()
-
-    if role == "Teacher":
-        teacher_interface(student_data)
-    elif role == "System Admin":
-        system_interface(student_data)
-    else:
-        student_interface(student_data)
+except Exception as e:
+    st.error(f"An Exception Occurred: {e}")
