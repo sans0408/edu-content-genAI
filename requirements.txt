@@ -1,4 +1,10 @@
-streamlit
-pandas
-altair
+streamlit==1.36.0
+pandas==2.2.2
+altair==5.3.0
+huggingface-hub==0.23.3
+langchain==0.2.11
+langchain-huggingface==0.0.3
+langchain-community==0.2.10
+pypdf
+faiss-cpu
 ollama
